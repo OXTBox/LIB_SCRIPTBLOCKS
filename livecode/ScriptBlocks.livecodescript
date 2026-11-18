@@ -41,6 +41,7 @@ end Ed.Paths
 on Ed.BuildUI
    lock screen
    set the title of me to "FOR OWNER | ScriptBlocks: click a script on the left, edit it, Save writes the file (nothing runs)"
+   dispatch "Users.TitleStack" with the short name of me, "ScriptBlocks: click a script on the left, edit it, Save writes the file (nothing runs)"   -- LIB_USERS words it, when in use
    set the rect of me to 60, 60, 1260, 860
    Ed.Field "List", "10,44,330,790", true, true
    set the listBehavior of field "List" to true
