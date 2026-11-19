@@ -133,29 +133,69 @@ def main():
     for cat, items in sorted(blocks.items()):
         folder = os.path.join(OUT, 'scriptBlocks')
         os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, cat + '.txt'), 'w', encoding='utf-8') as f:
-            srcs = sorted({s for s, _, _, _ in items})
+        path = os.path.join(folder, cat + '.txt')
+        srcs = sorted({s for s, _, _, _ in items})
+        kept = []      # sections from other sources already in the file stay (a second harvest adds)
+        if os.path.exists(path):
+            for sec in re.split(r'(?m)^(?=-{60} from )', open(path, encoding='utf-8').read())[1:]:
+                if sec.split('\n', 1)[0][61 + 5:].split(' (')[0].strip() not in srcs:
+                    kept.append(sec.rstrip('\n') + '\n\n')
+        body = ''
+        for src in srcs:
+            body += '------------------------------------------------------------ from %s\n\n' % src
+            for s, name, hkind, body_ in items:
+                if s == src:
+                    body += body_.rstrip('\n') + '\n\n'
+        text = ''.join(kept) + body
+        allsrc = [l[66:].split(' (')[0].strip() for l in text.split('\n') if l.startswith('-' * 60 + ' from ')]
+        count = len(re.findall(r'(?m)^\s*(?:private\s+)?(?:on|function|command|getProp|setProp)\s', text))
+        with open(path, 'w', encoding='utf-8') as f:
             f.write(header(['script block: %s (handlers whose names start with "%s"; GAD scriptBlocks)' % (cat, cat),
-                            'source: %s' % ', '.join(srcs), 'handlers: %d' % len(items)]))
-            for src in srcs:
-                f.write('------------------------------------------------------------ from %s\n\n' % src)
-                for s, name, hkind, body in items:
-                    if s == src:
-                        f.write(body.rstrip('\n') + '\n\n')
-        index.append(('scriptBlocks/%s.txt' % cat, 'block', cat, len(items), ', '.join(sorted({s for s, _, _, _ in items})), 1))
+                            'source: %s' % ', '.join(allsrc), 'handlers: %d' % count]))
+            f.write(text)
+    n = write_index(args)
+    print('%d files written (%d blocks, %d object scripts); index lists %d -> %s' % (len(index) + len(blocks), len(blocks),
+                                                                              len(index), n, OUT))
+
+
+def write_index(args):
+    """index.tsv and INDEX.md from every file in OUT (not just this run), read from the files' headers"""
+    rows = []
+    for sub in ('objects', 'scriptBlocks'):
+        for dirpath, _, files in os.walk(os.path.join(OUT, sub)):
+            for fn in sorted(files):
+                if not fn.endswith('.txt'):
+                    continue
+                path = os.path.join(dirpath, fn)
+                head = {}
+                for line in open(path, encoding='utf-8'):
+                    if not line.startswith('-- '):
+                        break
+                    k, _, v = line[3:].strip().partition(': ')
+                    head[k] = v
+                rel = os.path.relpath(path, OUT).replace(os.sep, '/')
+                if sub == 'scriptBlocks':
+                    cat = fn[:-4]
+                    rows.append((rel, 'block', cat, int(head.get('handlers', '0') or 0), head.get('source', ''), 1))
+                else:
+                    used = [k for k in head if k.startswith('used by ')]
+                    users = int(used[0].split()[2]) if used else 1
+                    hs = head.get('handlers', '')
+                    rows.append((rel, rel.split('/')[1], '', len([h for h in hs.split(', ') if h]), head.get('source', ''), users))
+    rows.sort()
+    sources = sorted({s.strip() for r in rows for s in r[4].split(',') if s.strip()})
     with open(os.path.join(OUT, 'index.tsv'), 'w', encoding='utf-8') as f:
         f.write('file\tkind\tcategory\thandlers\tsource\tusers\n')
-        for row in sorted(index):
+        for row in rows:
             f.write('\t'.join(str(x) for x in row) + '\n')
     with open(os.path.join(OUT, 'INDEX.md'), 'w', encoding='utf-8') as f:
         f.write('# Data/Example: generic scripts (INACTIVE)\n\nMade by `LIB_SCRIPTBLOCKS/tools/harvest_blocks.py` from: %s.\n'
                 'Plain text: none of these is the script of anything until applied on purpose\n'
                 '(`LIB_SCRIPTBLOCKS/livecode/ScriptBlocks.livecodescript`: Check, then Apply).\n\n'
-                '| file | kind | handlers | users |\n|---|---|---|---|\n' % ', '.join(os.path.basename(os.path.normpath(a)) for a in args))
-        for row in sorted(index):
+                '| file | kind | handlers | users |\n|---|---|---|---|\n' % ', '.join(sources))
+        for row in rows:
             f.write('| `%s` | %s | %s | %s |\n' % (row[0], row[1] if row[1] != 'block' else 'block: ' + row[2], row[3], row[5]))
-    print('%d files (%d blocks, %d object scripts) -> %s' % (len(index), sum(1 for r in index if r[1] == 'block'),
-                                                            sum(1 for r in index if r[1] != 'block'), OUT))
+    return len(rows)
 
 
 if __name__ == '__main__':
