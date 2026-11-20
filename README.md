@@ -29,3 +29,9 @@ Then open `livecode/ScriptBlocks.livecodescript` in LiveCode (IDE or the LIB_MCP
   blocks with a stack script. They edit OTHER stacks or script files, with a backup before every
   write, never their own source. GAD's bugs are fixed on the way (`LIB_GAD/GAD_SELF_WRITING_SCRIPTS.md`).
 - **Block palette view:** the categories as a row of buttons, like GAD's `scriptBlocks` group.
+
+## Licence
+
+GPL-3.0 (see `LICENSE`), because the xTalk work here is built on the GPL-licensed LiveCode Community 9 engine. Copyright (c) 2026 xAction.
+
+The Python files (`.py`) and other material that is not xTalk are also offered under the MIT licence, Copyright (c) 2026 xAction: you may use them under either licence.
